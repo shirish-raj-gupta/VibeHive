@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import InputField from '../../components/InputField';
+import { auth, createUserWithEmailAndPassword, sendEmailVerification } from '../../utils/firebase';
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -12,6 +13,10 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const [otpError, setOtpError] = useState('');
+  const [userId, setUserId] = useState('');
+
   const router = useRouter();
 
   const handleSubmit = async (e) => {
@@ -26,30 +31,43 @@ export default function Register() {
     setError('');
 
     try {
-      const response = await fakeRegisterApi(name, email, phone, password);
+      // Call backend API to register user
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/register';
+      const response = await fetch(backendUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          email,
+          phone,
+          password
+        })
+      });
 
-      if (response.success) {
-        router.push('/login');
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setUserId(data.userId);
+
+        // Create user in Firebase with email and password
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+
+        // Send email verification
+        await sendEmailVerification(user);
+
+        // Redirect to OTP step or success page
+        setOtpError('');
+        router.push('/login');  // Skip OTP step if only email verification is required
       } else {
-        setError(response.message);
+        setError(data.message || 'Registration failed');
       }
-    } catch (error) {
-      setError('An error occurred while registering. Please try again.');
+    } catch (err) {
+      console.error('Registration failed:', err);
+      setError('Failed to register. Please try again.');
     } finally {
       setLoading(false);
     }
-  };
-
-  const fakeRegisterApi = (name, email, phone, password) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        if (email !== 'user@example.com') {
-          resolve({ success: true });
-        } else {
-          resolve({ success: false, message: 'Email already registered' });
-        }
-      }, 1000);
-    });
   };
 
   return (
@@ -91,17 +109,16 @@ export default function Register() {
           onChange={(e) => setEmail(e.target.value)}
         />
 
-<InputField
-  label="Phone Number"
-  type="tel"
-  id="phone"
-  placeholder="+1 234 567 8901"
-  pattern="^\+?[0-9\s\-]{7,15}$"
-  value={phone}
-  onChange={(e) => setPhone(e.target.value)}
-  required
-/>
-
+        <InputField
+          label="Phone Number"
+          type="tel"
+          id="phone"
+          placeholder="+1 234 567 8901"
+          pattern="^\+?[0-9\s\-]{7,15}$"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          required
+        />
 
         <InputField
           label="Password"
@@ -112,19 +129,16 @@ export default function Register() {
           onChange={(e) => setPassword(e.target.value)}
         />
 
-<motion.button
-  whileTap={{ scale: 0.97 }}
-  type="submit"
-  className={`w-full py-3 rounded-xl font-semibold text-lg transition duration-300 ease-in-out ${
-    loading
-      ? 'bg-gray-400 text-white cursor-not-allowed'
-      : 'bg-white text-[#1d464a] hover:bg-gray-100 shadow-md'
-  }`}
-  disabled={loading}
->
-  {loading ? 'Registering...' : 'Register'}
-</motion.button>
-
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          type="submit"
+          className={`w-full py-3 rounded-xl font-semibold text-lg transition duration-300 ease-in-out ${
+            loading ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-white text-[#1d464a] hover:bg-gray-100 shadow-md'
+          }`}
+          disabled={loading}
+        >
+          {loading ? 'Registering...' : 'Register'}
+        </motion.button>
       </form>
 
       <p className="mt-6 text-center text-sm text-teal-100">

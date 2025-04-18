@@ -10,61 +10,55 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isClient, setIsClient] = useState(false); // New state to handle client-side rendering
+  const [isClient, setIsClient] = useState(false);
   const router = useRouter();
 
-  const fakeLoginApi = (email, password) => {
-    return new Promise((resolve, reject) => {
-      const fakeUser = {
-        email: 'user@example.com',
-        password: 'password123',
-      };
-
-      setTimeout(() => {
-        if (email === fakeUser.email && password === fakeUser.password) {
-          resolve({ success: true });
-        } else {
-          reject({ success: false, message: 'Invalid email or password' });
-        }
-      }, 1000);
-    });
-  };
+  useEffect(() => {
+    setIsClient(true); // Wait for hydration
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
+  
     if (!email || !password) {
       setError('Please fill in both fields');
       return;
     }
-
+  
     setLoading(true);
     setError('');
-
+  
     try {
-      const response = await fakeLoginApi(email, password);
-
-      if (response.success) {
-        const mockUser = { name: 'John Doe', email };
-        localStorage.setItem('user', JSON.stringify(mockUser));
-        router.push('/dashboard');
-      } else {
-        setError('Invalid email or password');
+      const response = await fetch('http://localhost:5000/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+  
+      const data = await response.json();
+  
+      if (!response.ok) {
+        setError(data.message || 'Login failed');
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      setError('An error occurred while logging in. Please try again.');
+  
+      // Save token and user info to localStorage
+      localStorage.setItem('token', data.token);         // <-- JWT stored here
+      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('userId', data.user.userId); 
+  
+      router.push('/dashboard');
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('An error occurred. Please try again later.');
     } finally {
       setLoading(false);
     }
   };
+  
 
-  useEffect(() => {
-    setIsClient(true); // Set state to true after the component has mounted on the client
-  }, []);
-
-  if (!isClient) {
-    return null; // Don't render anything until client-side rendering
-  }
+  if (!isClient) return null;
 
   return (
     <motion.div
@@ -105,18 +99,18 @@ export default function Login() {
           onChange={(e) => setPassword(e.target.value)}
         />
 
-<motion.button
-    whileTap={{ scale: 0.97 }}
-    type="submit"
-    className={`w-full py-3 rounded-xl font-semibold text-lg transition duration-300 ease-in-out ${
-      loading
-        ? 'bg-gray-400 text-white cursor-not-allowed'
-        : 'bg-white text-[#1d464a] hover:bg-gray-100 shadow-md'
-    }`}
-    disabled={loading}
-  >
-    {loading ? 'Logging in...' : 'Login'}
-  </motion.button>
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          type="submit"
+          className={`w-full py-3 rounded-xl font-semibold text-lg transition duration-300 ease-in-out ${
+            loading
+              ? 'bg-gray-400 text-white cursor-not-allowed'
+              : 'bg-white text-[#1d464a] hover:bg-gray-100 shadow-md'
+          }`}
+          disabled={loading}
+        >
+          {loading ? 'Logging in...' : 'Login'}
+        </motion.button>
       </form>
 
       <p className="mt-6 text-center text-sm text-teal-100">

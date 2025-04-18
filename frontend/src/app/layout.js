@@ -3,7 +3,7 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'Eventify – Manage and Discover Events',
+  title: 'VibeHive – Manage and Discover Events',
   description: 'Create, manage, and explore events with Eventify.',
 };
 

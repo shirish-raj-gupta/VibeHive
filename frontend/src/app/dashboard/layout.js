@@ -10,6 +10,7 @@ import {
   FaUsers,
   FaClipboardList,
   FaCog,
+  FaTicketAlt,
 } from 'react-icons/fa';
 
 export default function DashboardLayout({ children }) {
@@ -45,6 +46,7 @@ export default function DashboardLayout({ children }) {
             { href: '/dashboard/create-event', icon: FaCalendarAlt, label: 'Create Event' },
             { href: '/dashboard/events', icon: FaListAlt, label: 'Event List' },
             { href: '/dashboard/guest-list', icon: FaUsers, label: 'Guest List' },
+            { href: '/dashboard/my-tickets', icon: FaTicketAlt, label: 'My Tickets' },
             { href: '/dashboard/rsvp-tracker', icon: FaClipboardList, label: 'RSVP Tracker' },
             { href: '/dashboard/settings', icon: FaCog, label: 'Settings' },
           ].map(({ href, icon: Icon, label }) => (

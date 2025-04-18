@@ -1,53 +1,70 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { FaWhatsapp, FaInstagram, FaTwitter } from 'react-icons/fa';
+
+const getEventsFromDB = async () => {
+  try {
+    const response = await fetch('http://localhost:5000/api/eventslist');
+    if (!response.ok) throw new Error('Failed to fetch events');
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching events:', error);
+    return [];
+  }
+};
 
 export default function EventListPage() {
   const [events, setEvents] = useState([]);
+  const [attendees, setAttendees] = useState({});
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [attendees, setAttendees] = useState(1); // Start with 1 attendee
   const [showModal, setShowModal] = useState(false);
+  const [confirmation, setConfirmation] = useState('yes'); // Default confirmation is 'yes'
 
   useEffect(() => {
-    setEvents([
-      {
-        id: 1,
-        name: 'Music Concert',
-        date: '2025-06-15',
-        time: '7:00 PM',
-        fee: '₹500',
-        image: '/event1.jpg',
-      },
-      {
-        id: 2,
-        name: 'Startup Pitch Fest',
-        date: '2025-07-01',
-        time: '11:00 AM',
-        fee: '₹1000',
-        image: '/event2.jpg',
-      },
-    ]);
+    const fetchEvents = async () => {
+      const rawEvents = await getEventsFromDB();
+      setEvents(rawEvents);
+    };
+
+    fetchEvents();
   }, []);
 
-  const handleRegister = (event) => {
-    setSelectedEvent(event);
-    setAttendees(1); // Reset attendees to 1
-    setShowModal(true);
+  const increment = (eventId) => {
+    setAttendees((prev) => ({
+      ...prev,
+      [eventId]: Math.min((prev[eventId] || 1) + 1, 6),
+    }));
   };
 
-  const handleAttendeesChange = (operation) => {
-    if (operation === 'increment') {
-      setAttendees((prev) => prev + 1);
-    } else if (operation === 'decrement' && attendees > 1) {
-      setAttendees((prev) => prev - 1);
-    }
+  const decrement = (eventId) => {
+    setAttendees((prev) => ({
+      ...prev,
+      [eventId]: Math.max((prev[eventId] || 1) - 1, 1),
+    }));
   };
 
-  const handleConfirmRegistration = () => {
-    // Registration logic (API call or local storage) goes here
-    alert(`Registered for ${selectedEvent.name} with ${attendees} attendees.`);
-    setShowModal(false); // Close the modal after registration
+  const handleRegistration = async () => {
+    const token = localStorage.getItem('token');
+    const response = await fetch('http://localhost:5000/api/registerEvent', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        eventId: selectedEvent.eventId,
+        attendees: attendees[selectedEvent.eventId] || 1,
+        confirmation, // Use selected confirmation value
+      }),
+    });
+    console.log(response);
+    
+
+    const result = await response.json();
+    alert(result.message);
+    setShowModal(false);
   };
 
   return (
@@ -55,78 +72,86 @@ export default function EventListPage() {
       <h1 className="text-3xl font-bold mb-6 text-[#1D464A]">All Events</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {events.map((event) => (
-          <div key={event.id} className="border rounded-lg shadow-lg overflow-hidden bg-white transform transition-all duration-300 hover:scale-105">
-            <img
-              src={event.image}
-              alt={event.name}
-              className="h-48 w-full object-cover rounded-t-lg"
-            />
+          <div
+            key={event.eventId}
+            className="border rounded-lg shadow-lg bg-white transform transition-all duration-300 hover:scale-105"
+          >
+            {event.image ? (
+              <img src={event.image} alt={event.name} className="h-48 w-full object-cover" />
+            ) : (
+              <div className="h-48 w-full bg-gray-200 flex items-center justify-center text-gray-500">No Image</div>
+            )}
             <div className="p-4">
               <h2 className="text-xl font-semibold text-[#1D464A]">{event.name}</h2>
-              <p className="text-sm text-gray-500">{event.date} at {event.time}</p>
-              <p className="mt-2 font-medium text-blue-600">Entry Fee: {event.fee}</p>
+              <p className="text-sm text-gray-500">{event.date} at {event.location}</p>
+              <p className="text-sm text-gray-600">Organizer: <span className="font-medium">{event.createdBy.name}</span></p>
+              <p className="text-sm text-gray-600">Phone: <span className="font-medium">{event.createdBy.phone}</span></p>
+              <p className="mt-2 font-medium text-blue-600">Entry Fee: ₹{event.price}</p>
+
+              <div className="mt-4 flex items-center gap-2">
+                <button onClick={() => decrement(event.eventId)} className="px-2 py-1 bg-gray-200 rounded">-</button>
+                <span>{attendees[event.eventId] || 1}</span>
+                <button onClick={() => increment(event.eventId)} className="px-2 py-1 bg-gray-200 rounded">+</button>
+              </div>
+
+              <button
+                onClick={() => {
+                  setSelectedEvent(event);
+                  setShowModal(true);
+                }}
+                className="mt-2 w-full bg-[#1D464A] text-white py-2 rounded"
+              >
+                Register
+              </button>
 
               <div className="flex justify-between items-center mt-4">
                 <div className="flex gap-3 text-gray-600 text-lg">
                   <a href={`https://wa.me/?text=Check out this event: ${event.name}`} target="_blank" rel="noopener noreferrer">
                     <FaWhatsapp className="hover:text-[#25D366]" />
                   </a>
-                  <a href={`https://instagram.com`} target="_blank" rel="noopener noreferrer">
+                  <a href="https://instagram.com" target="_blank" rel="noopener noreferrer">
                     <FaInstagram className="hover:text-[#E1306C]" />
                   </a>
                   <a href={`https://twitter.com/intent/tweet?text=Check out this event: ${event.name}`} target="_blank" rel="noopener noreferrer">
                     <FaTwitter className="hover:text-[#1DA1F2]" />
                   </a>
                 </div>
-                <button 
-                  className="bg-[#1D464A] text-white text-sm px-4 py-2 rounded-full hover:bg-[#145A59] transition-all duration-300"
-                  onClick={() => handleRegister(event)}
-                >
-                  Register
-                </button>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-96 shadow-lg">
-            <h2 className="text-2xl font-semibold text-[#1D464A]">{selectedEvent.name}</h2>
-            <p className="text-sm text-gray-500">{selectedEvent.date} at {selectedEvent.time}</p>
-            <p className="font-medium text-blue-600">Entry Fee: {selectedEvent.fee}</p>
+      {showModal && selectedEvent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white p-6 rounded-lg w-96 relative">
+            <button className="absolute top-2 right-2 text-gray-500" onClick={() => setShowModal(false)}>✕</button>
+            <h2 className="text-xl font-semibold mb-4">Confirm Registration</h2>
+            <p>Event: <strong>{selectedEvent.name}</strong></p>
+            <p>Attendees: <strong>{attendees[selectedEvent.eventId] || 1}</strong></p>
+            <p>Total: ₹{selectedEvent.price * (attendees[selectedEvent.eventId] || 1)}</p>
 
-            <div className="mt-4 flex justify-center items-center gap-4">
-              <button 
-                onClick={() => handleAttendeesChange('decrement')}
-                className="bg-[#1D464A] text-white p-3 rounded-full hover:bg-[#145A59] transition-all duration-200"
+            {/* Confirmation Dropdown */}
+            <div className="mt-4">
+              <label htmlFor="confirmation" className="block text-sm font-medium text-gray-700">Confirmation</label>
+              <select
+                id="confirmation"
+                className="mt-1 block w-full p-2 border border-gray-300 rounded"
+                value={confirmation}
+                onChange={(e) => setConfirmation(e.target.value)}
               >
-                -
-              </button>
-              <span className="text-xl">{attendees}</span>
-              <button 
-                onClick={() => handleAttendeesChange('increment')}
-                className="bg-[#1D464A] text-white p-3 rounded-full hover:bg-[#145A59] transition-all duration-200"
-              >
-                +
-              </button>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+                <option value="maybe">Maybe</option>
+              </select>
             </div>
 
-            <div className="mt-6 flex justify-between items-center">
-              <button 
-                onClick={handleConfirmRegistration} 
-                className="bg-[#1D464A] text-white px-6 py-2 rounded-lg hover:bg-[#145A59] transition-all duration-300"
-              >
-                Confirm Registration
-              </button>
-              <button 
-                onClick={() => setShowModal(false)} 
-                className="text-red-600 hover:underline text-sm"
-              >
-                Cancel
-              </button>
-            </div>
+            <button
+              className="mt-4 bg-green-600 text-white px-4 py-2 rounded"
+              onClick={handleRegistration}
+            >
+              Pay & Confirm
+            </button>
           </div>
         </div>
       )}
